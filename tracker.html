@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ky OS | Performance</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #020617;
+            --surface: rgba(15, 23, 42, 0.4);
+            --surface-hover: rgba(30, 41, 59, 0.6);
+            --surface-modal: rgba(15, 23, 42, 0.85);
+            --border: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #10b981; 
+            --accent-glow: #10b981;
+            --danger: #ef4444;
+            --radius-lg: 24px;
+            --radius-md: 16px;
+            --transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        [data-theme="blue"] { --bg-base: #020617; --accent: #38bdf8; --accent-glow: #38bdf8; }
+        [data-theme="purple"] { --bg-base: #0a0a0a; --accent: #a855f7; --accent-glow: #a855f7; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-base); color: var(--text-main); font-family: 'Plus Jakarta Sans', sans-serif;
+            min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 2rem; overflow-x: hidden; transition: background-color 0.8s ease;
+        }
+
+        /* Ambient Orbs */
+        .ambient-orbs { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; z-index: -1; pointer-events: none; }
+        .orb { position: absolute; border-radius: 50%; filter: blur(100px); opacity: 0.15; transition: background 1s ease; animation: float 20s infinite alternate ease-in-out; }
+        .orb-1 { width: 50vw; height: 50vw; top: -10%; left: -10%; background: var(--accent-glow); animation-delay: 0s; }
+        .orb-2 { width: 40vw; height: 40vw; bottom: -10%; right: -10%; background: var(--text-muted); animation-delay: -5s; }
+        @keyframes float { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(5%, 10%) scale(1.1); } }
+
+        /* Top Nav */
+        .top-nav { width: 100%; max-width: 1000px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; z-index: 10; }
+        .nav-left { display: flex; gap: 1rem; align-items: center; }
+        .back-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-main); padding: 0.6rem 1.2rem; border-radius: var(--radius-md); text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: var(--transition); display: flex; align-items: center; gap: 0.5rem;}
+        .back-btn:hover { background: var(--surface-hover); color: var(--accent); border-color: var(--accent); transform: translateX(-5px);}
+        .page-title { font-size: 1.2rem; font-weight: 600; color: var(--text-main); font-family: 'Fira Code', monospace; letter-spacing: -0.5px;}
+        
+        .theme-dots { display: flex; gap: 0.8rem; }
+        .theme-dot { width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 2px solid var(--border); transition: var(--transition); }
+        .theme-dot:hover { transform: scale(1.2); }
+        .theme-dot.emerald { background: #10b981; } .theme-dot.blue { background: #38bdf8; } .theme-dot.purple { background: #a855f7; }
+
+        /* Dashboard Grid */
+        .dashboard { width: 100%; max-width: 1000px; display: grid; grid-template-columns: 1fr 350px; gap: 1.5rem; }
+
+        .card {
+            background: var(--surface); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 2rem;
+            display: flex; flex-direction: column; transition: var(--transition); position: relative; overflow: hidden;
+        }
+        .card:hover { border-color: rgba(255, 255, 255, 0.15); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2); }
+
+        .card-header { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+        .header-title { display: flex; align-items: center; gap: 0.5rem; }
+        .header-title::before { content: ''; display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
+
+        /* --- Habits List (Left Column) --- */
+        .habits-col { display: flex; flex-direction: column; gap: 1.5rem; }
+        
+        .habit-input-wrapper { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .data-input { flex: 1; background: rgba(0,0,0,0.2); border: 1px solid var(--border); color: var(--text-main); padding: 0.8rem 1rem; outline: none; font-family: 'Plus Jakarta Sans'; font-size: 0.9rem; transition: var(--transition); border-radius: 12px;}
+        .data-input:focus { border-color: var(--accent); background: rgba(0,0,0,0.4);}
+        .add-btn { background: var(--accent); color: var(--bg-base); border: none; padding: 0 1.2rem; border-radius: 12px; font-weight: 600; cursor: pointer; transition: var(--transition); font-size: 1.2rem;}
+        .add-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px var(--accent-glow); }
+
+        /* NEW: Scrollbar styling for Habit List */
+        .habit-list { 
+            list-style: none; display: flex; flex-direction: column; gap: 0.8rem; 
+            max-height: 400px; /* Constrain height */
+            overflow-y: auto;  /* Enable vertical scroll */
+            padding-right: 0.5rem; /* Space for scrollbar */
+        }
+        
+        /* Custom Webkit Scrollbar */
+        .habit-list::-webkit-scrollbar { width: 6px; }
+        .habit-list::-webkit-scrollbar-track { background: transparent; }
+        .habit-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; transition: background 0.3s;}
+        .habit-list:hover::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); }
+
+        .habit-item { 
+            display: flex; align-items: center; justify-content: space-between; padding: 1rem; 
+            background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 12px; transition: var(--transition); cursor: pointer;
+            flex-shrink: 0; /* Prevent items from squishing when list overflows */
+        }
+        .habit-item:active { transform: scale(0.98); }
+        .habit-item:hover { background: rgba(255,255,255,0.05); border-color: var(--text-muted); }
+        .habit-item.completed { background: rgba(16, 185, 129, 0.05); border-color: var(--accent); }
+        .habit-item.completed .habit-name { color: var(--text-muted); text-decoration: line-through; }
+        
+        .habit-info { display: flex; align-items: center; gap: 1rem; flex: 1; overflow: hidden; pointer-events: none;}
+        .habit-name { font-size: 1rem; font-weight: 500; transition: var(--transition); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        /* Custom Checkbox */
+        .checkbox { width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--border); display: flex; justify-content: center; align-items: center; transition: var(--transition); flex-shrink: 0;}
+        .habit-item.completed .checkbox { background: var(--accent); border-color: var(--accent); }
+        .checkbox::after { content: '✓'; color: var(--bg-base); font-size: 14px; font-weight: 800; opacity: 0; transform: scale(0); transition: var(--transition); }
+        .habit-item.completed .checkbox::after { opacity: 1; transform: scale(1); }
+
+        /* Habit Actions */
+        .habit-actions { display: flex; gap: 0.5rem; opacity: 0; transition: var(--transition); transform: translateX(10px);}
+        .habit-item:hover .habit-actions { opacity: 1; transform: translateX(0); }
+        .icon-btn { background: rgba(255,255,255,0.05); border: none; color: var(--text-muted); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; transition: var(--transition); display: flex; justify-content: center; align-items: center; font-size: 1rem;}
+        .icon-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-main); }
+        .icon-btn.delete:hover { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+
+        /* Empty State */
+        .empty-state { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.9rem; border: 1px dashed var(--border); border-radius: 12px; margin-top: 1rem; background: linear-gradient(180deg, transparent, rgba(255,255,255,0.02));}
+
+        /* --- Analytics (Right Column) --- */
+        .analytics-col { display: flex; flex-direction: column; gap: 1.5rem; }
+
+        /* Progress Ring */
+        .progress-wrapper { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem 0 0.5rem 0; }
+        .ring-container { position: relative; width: 160px; height: 160px; transition: var(--transition); z-index: 2;}
+        .ring-svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+        .ring-bg { fill: none; stroke: rgba(255,255,255,0.05); stroke-width: 8; }
+        .ring-meter { fill: none; stroke: var(--accent); stroke-width: 8; stroke-linecap: round; filter: drop-shadow(0 0 8px var(--accent-glow)); transition: stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.5s ease; }
+        .ring-text { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .ring-percent { font-family: 'Fira Code', monospace; font-size: 2.2rem; font-weight: 600; color: var(--text-main); transition: var(--transition);}
+        .ring-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; transition: var(--transition);}
+
+        /* OS Insight Terminal */
+        .os-insight { font-family: 'Fira Code', monospace; font-size: 0.7rem; color: var(--text-muted); text-align: center; margin-top: 1rem; background: rgba(0,0,0,0.3); padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); letter-spacing: -0.5px;}
+
+        /* 100% Celebration Animation */
+        .ring-container.celebrate { animation: pulseGlow 2s infinite; }
+        .ring-container.celebrate .ring-percent { color: var(--accent); text-shadow: 0 0 15px var(--accent-glow); }
+        @keyframes pulseGlow {
+            0% { transform: scale(1); filter: drop-shadow(0 0 10px var(--accent-glow)); }
+            50% { transform: scale(1.05); filter: drop-shadow(0 0 25px var(--accent-glow)); }
+            100% { transform: scale(1); filter: drop-shadow(0 0 10px var(--accent-glow)); }
+        }
+
+        /* Particle System CSS */
+        .particle { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: var(--accent); border-radius: 50%; pointer-events: none; opacity: 0; z-index: 1;}
+        @keyframes shoot {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+        }
+
+        /* Stats Grid */
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;}
+        .stat-box { background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; text-align: center; border: 1px solid var(--border);}
+        .stat-num { font-family: 'Fira Code', monospace; font-size: 1.8rem; font-weight: 600; color: var(--accent); margin-bottom: 0.2rem;}
+        .stat-name { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;}
+
+        /* Performance Matrix */
+        .matrix-container { display: flex; flex-direction: column; gap: 0.5rem; }
+        .matrix-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+        .matrix-cell { aspect-ratio: 1; border-radius: 4px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.02); transition: var(--transition); position: relative; cursor: crosshair;}
+        
+        .matrix-cell:hover::after {
+            content: attr(data-date) " • " attr(data-score) "%"; position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%);
+            background: var(--surface-hover); padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.75rem; color: var(--text-main);
+            white-space: nowrap; border: 1px solid var(--border); backdrop-filter: blur(10px); z-index: 10; font-family: 'Plus Jakarta Sans';
+        }
+
+        /* --- MODALS --- */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            z-index: 1000; display: flex; justify-content: center; align-items: center;
+            opacity: 0; pointer-events: none; transition: var(--transition);
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+        .modal-box {
+            background: var(--surface-modal); border: 1px solid var(--border); border-radius: var(--radius-lg);
+            width: 90%; max-width: 400px; padding: 2rem; transform: scale(0.9); opacity: 0; transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); display: none; text-align: center;
+        }
+        .modal-overlay.active .modal-box.active { transform: scale(1); opacity: 1; display: block; }
+        .modal-header h3 { font-size: 1.2rem; color: var(--text-main); font-weight: 600; margin-bottom: 1.5rem;}
+        
+        .btn-group { display: flex; gap: 1rem; margin-top: 1.5rem; }
+        .btn { flex: 1; padding: 0.8rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); color: var(--text-main); border-radius: var(--radius-md); cursor: pointer; transition: var(--transition); font-family: 'Plus Jakarta Sans'; font-weight: 500; font-size: 0.95rem;}
+        .btn:hover { background: rgba(255,255,255,0.1); border-color: var(--text-muted); }
+        .btn.primary { background: var(--accent); color: var(--bg-base); border-color: var(--accent); font-weight: 600;}
+        .btn.primary:hover { opacity: 0.9; transform: translateY(-2px); box-shadow: 0 5px 15px var(--accent-glow);}
+        .btn.danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); border-color: rgba(239, 68, 68, 0.3); }
+        .btn.danger:hover { background: var(--danger); color: #fff; border-color: var(--danger); transform: translateY(-2px);}
+
+        @media (max-width: 768px) { .dashboard { grid-template-columns: 1fr; } .habit-actions { opacity: 1; transform: none; } }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+    </div>
+
+    <div class="top-nav">
+        <div class="nav-left">
+            <a href="dashboard.html" class="back-btn">← Hub</a>
+            <div class="page-title">Krishna's OS // PERFORMANCE</div>
+        </div>
+        <div class="theme-dots">
+            <div class="theme-dot emerald" onclick="setTheme('emerald')" title="Emerald"></div>
+            <div class="theme-dot blue" onclick="setTheme('blue')" title="Ocean"></div>
+            <div class="theme-dot purple" onclick="setTheme('purple')" title="Nebula"></div>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        
+        <div class="habits-col">
+            <div class="card" style="flex: 1;">
+                <div class="card-header">
+                    <span class="header-title">Today's Protocol</span>
+                    <span id="current-date" style="font-family: 'Fira Code', monospace; color: var(--text-main);">Loading...</span>
+                </div>
+
+                <div class="habit-input-wrapper">
+                    <input type="text" id="new-habit-input" class="data-input" placeholder="Define a new daily target...">
+                    <button class="add-btn" onclick="addHabit()" title="Add Target">+</button>
+                </div>
+
+                <div id="empty-state" class="empty-state" style="display: none;">
+                    System idle. Add a target above to begin tracking.
+                </div>
+
+                <ul class="habit-list" id="habit-list"></ul>
+            </div>
+        </div>
+
+        <div class="analytics-col">
+            
+            <div class="card" style="position: relative;">
+                <div class="card-header"><span class="header-title">Daily Execution</span></div>
+                
+                <div class="progress-wrapper">
+                    <div class="ring-container" id="ring-container">
+                        <div id="particle-anchor" style="position: absolute; top: 50%; left: 50%; z-index: -1;"></div>
+                        
+                        <svg class="ring-svg" viewBox="0 0 100 100">
+                            <circle class="ring-bg" cx="50" cy="50" r="42"></circle>
+                            <circle class="ring-meter" id="progress-ring" cx="50" cy="50" r="42" style="stroke-dasharray: 264; stroke-dashoffset: 264;"></circle>
+                        </svg>
+                        <div class="ring-text">
+                            <span class="ring-percent" id="progress-text">0%</span>
+                            <span class="ring-label" id="progress-label">Completed</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="os-insight" id="os-insight">> System awaiting data...</div>
+
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-num" id="stat-streak">0</div>
+                        <div class="stat-name">Day Streak</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-num" id="stat-best">0</div>
+                        <div class="stat-name">Best Streak</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><span class="header-title">30-Day Matrix</span></div>
+                <div class="matrix-container">
+                    <div class="matrix-grid" id="matrix-grid"></div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.7rem; color: var(--text-muted); font-family: 'Fira Code', monospace;">
+                        <span>-30d</span>
+                        <span>Today</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal-box" id="modal-delete">
+            <div class="modal-header"><h3>Purge Target?</h3></div>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">This will permanently erase this target and its historical data from the Matrix.</p>
+            <div class="btn-group">
+                <button class="btn" onclick="closeModals()">Cancel</button>
+                <button class="btn danger" onclick="confirmDelete()">Execute Purge</button>
+            </div>
+        </div>
+
+        <div class="modal-box" id="modal-edit">
+            <div class="modal-header"><h3>Reconfigure Target</h3></div>
+            <input type="text" id="edit-habit-input" class="data-input" placeholder="New parameter...">
+            <div class="btn-group">
+                <button class="btn" onclick="closeModals()">Cancel</button>
+                <button class="btn primary" onclick="confirmEdit()">Save Parameters</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 0. Audio Synthesizer (Haptic Feedback) ---
+        // Generates UI sounds without needing external files
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            const now = audioCtx.currentTime;
+            
+            if (type === 'check') {
+                // A satisfying soft "pop/tick"
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now); osc.stop(now + 0.05);
+            } else if (type === 'uncheck') {
+                // A duller pop
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.05);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now); osc.stop(now + 0.05);
+            } else if (type === 'success') {
+                // A bright chime for 100%
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, now); // A4
+                osc.frequency.setValueAtTime(880, now + 0.1); // A5
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.2, now + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+                osc.start(now); osc.stop(now + 0.8);
+            }
+        }
+
+        // --- 0. Particle Engine ---
+        function triggerConfetti() {
+            const anchor = document.getElementById('particle-anchor');
+            const color = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+            
+            for (let i = 0; i < 30; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                p.style.backgroundColor = color;
+                
+                // Random outward trajectory
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 80 + Math.random() * 80; // 80px to 160px out
+                const tx = Math.cos(angle) * distance + 'px';
+                const ty = Math.sin(angle) * distance + 'px';
+                
+                p.style.setProperty('--tx', tx);
+                p.style.setProperty('--ty', ty);
+                p.style.animation = `shoot ${0.5 + Math.random() * 0.5}s ease-out forwards`;
+                
+                anchor.appendChild(p);
+                // Clean up DOM after animation
+                setTimeout(() => p.remove(), 1000);
+            }
+        }
+
+        // --- 1. Load Data ---
+        const today = new Date().toISOString().split('T')[0]; 
+        
+        let habits = JSON.parse(localStorage.getItem('ky_habits')) || [
+            { id: 'h1', name: 'CUET Mock Test' },
+            { id: 'h2', name: 'Spaced Repetition Review' },
+            { id: 'h3', name: 'Code for 1 Hour' }
+        ];
+        let logs = JSON.parse(localStorage.getItem('ky_logs')) || {};
+
+        if (!logs[today]) {
+            logs[today] = {};
+            habits.forEach(h => logs[today][h.id] = false);
+        }
+
+        let activeEditId = null;
+        let activeDeleteId = null;
+
+        // --- 2. Define Functions ---
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('ky_theme', theme);
+            if (typeof renderMatrix === 'function') {
+                renderMatrix();
+                updateProgress(); 
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('ky_habits', JSON.stringify(habits));
+            localStorage.setItem('ky_logs', JSON.stringify(logs));
+            updateDashboard();
+        }
+
+        function addHabit() {
+            const input = document.getElementById('new-habit-input');
+            const name = input.value.trim();
+            if (name) {
+                const newId = 'h_' + Date.now();
+                habits.push({ id: newId, name: name });
+                logs[today][newId] = false;
+                input.value = '';
+                saveData();
+            }
+        }
+
+        function toggleHabit(id) {
+            logs[today][id] = !logs[today][id];
+            // Play corresponding sound
+            if (logs[today][id]) playSound('check');
+            else playSound('uncheck');
+            
+            saveData();
+        }
+
+        document.getElementById('new-habit-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') addHabit();
+        });
+
+        // Modals
+        function openEditModal(id) {
+            activeEditId = id;
+            document.getElementById('edit-habit-input').value = habits.find(h => h.id === id).name;
+            openModal('modal-edit');
+            setTimeout(() => document.getElementById('edit-habit-input').focus(), 100);
+        }
+
+        function confirmEdit() {
+            const newName = document.getElementById('edit-habit-input').value.trim();
+            if(newName && activeEditId) {
+                habits.find(h => h.id === activeEditId).name = newName;
+                saveData(); closeModals();
+            }
+        }
+
+        document.getElementById('edit-habit-input').addEventListener('keypress', e => { if (e.key === 'Enter') confirmEdit(); });
+
+        function openDeleteModal(id) { activeDeleteId = id; openModal('modal-delete'); }
+
+        function confirmDelete() {
+            if(activeDeleteId) {
+                habits = habits.filter(h => h.id !== activeDeleteId);
+                for (let date in logs) { delete logs[date][activeDeleteId]; }
+                saveData(); closeModals();
+            }
+        }
+
+        const overlay = document.getElementById('modal-overlay');
+        function openModal(modalId) {
+            document.querySelectorAll('.modal-box').forEach(m => m.classList.remove('active'));
+            document.getElementById(modalId).classList.add('active');
+            overlay.classList.add('active');
+        }
+        function closeModals() {
+            overlay.classList.remove('active');
+            document.querySelectorAll('.modal-box').forEach(m => m.classList.remove('active'));
+            activeEditId = null; activeDeleteId = null;
+        }
+        overlay.addEventListener('click', e => { if(e.target === overlay) closeModals(); });
+
+
+        // --- UI Rendering ---
+        function updateDashboard() {
+            renderHabits();
+            updateProgress();
+            calculateStreaks();
+            renderMatrix();
+        }
+
+        function renderHabits() {
+            const list = document.getElementById('habit-list');
+            const emptyState = document.getElementById('empty-state');
+            list.innerHTML = '';
+            
+            if (habits.length === 0) {
+                emptyState.style.display = 'block';
+            } else {
+                emptyState.style.display = 'none';
+                habits.forEach(habit => {
+                    const isDone = logs[today][habit.id] === true;
+                    const li = document.createElement('li');
+                    li.className = `habit-item ${isDone ? 'completed' : ''}`;
+                    // Attach toggle to the whole item
+                    li.onclick = (e) => {
+                        // Prevent toggle if clicking action buttons
+                        if(!e.target.closest('.habit-actions')) toggleHabit(habit.id);
+                    };
+                    
+                    li.innerHTML = `
+                        <div class="habit-info">
+                            <div class="checkbox"></div>
+                            <span class="habit-name" title="${habit.name}">${habit.name}</span>
+                        </div>
+                        <div class="habit-actions">
+                            <button class="icon-btn" onclick="openEditModal('${habit.id}')" title="Reconfigure">✎</button>
+                            <button class="icon-btn delete" onclick="openDeleteModal('${habit.id}')" title="Purge">✕</button>
+                        </div>
+                    `;
+                    list.appendChild(li);
+                });
+            }
+        }
+
+        // Global flag to prevent repeating confetti if you uncheck/recheck rapidly
+        let hasCelebratedToday = false; 
+
+        function updateProgress() {
+            const total = habits.length;
+            if (total === 0) {
+                setRing(0); 
+                updateInsight(0);
+                return;
+            }
+            
+            const completed = habits.filter(h => logs[today][h.id] === true).length;
+            const percent = Math.round((completed / total) * 100);
+            
+            setRing(percent);
+            updateInsight(percent);
+            
+            // Celebration Trigger
+            if (percent === 100 && !hasCelebratedToday) {
+                playSound('success');
+                triggerConfetti();
+                hasCelebratedToday = true;
+            } else if (percent < 100) {
+                hasCelebratedToday = false; // Reset if they uncheck something
+            }
+        }
+
+        function updateInsight(percent) {
+            const terminal = document.getElementById('os-insight');
+            if (habits.length === 0) {
+                terminal.innerHTML = "> System idle. Awaiting protocols.";
+            } else if (percent === 0) {
+                terminal.innerHTML = "> Protocols loaded. Ready for execution.";
+            } else if (percent < 50) {
+                terminal.innerHTML = "> Execution in progress. Maintain focus.";
+            } else if (percent < 100) {
+                terminal.innerHTML = "> Past 50%. Optimization trajectory looks good.";
+            } else {
+                terminal.innerHTML = `<span style="color: var(--accent);">> All daily protocols successfully executed.</span>`;
+            }
+        }
+
+        function setRing(percent) {
+            const meter = document.getElementById('progress-ring');
+            const text = document.getElementById('progress-text');
+            const label = document.getElementById('progress-label');
+            const container = document.getElementById('ring-container');
+            const circumference = 2 * Math.PI * 42; 
+            
+            const offset = circumference - (percent / 100) * circumference;
+            meter.style.strokeDashoffset = offset;
+            text.textContent = `${percent}%`;
+            
+            const currentTheme = localStorage.getItem('ky_theme') || 'emerald';
+            let baseColor = currentTheme === 'blue' ? '#38bdf8' : currentTheme === 'purple' ? '#a855f7' : '#10b981';
+            
+            if(percent === 100 && habits.length > 0) {
+                meter.style.stroke = '#fff';
+                meter.style.filter = `drop-shadow(0 0 15px ${baseColor})`;
+                container.classList.add('celebrate');
+                label.textContent = "Flawless";
+                label.style.color = 'var(--accent)';
+            } else {
+                meter.style.stroke = 'var(--accent)';
+                meter.style.filter = 'drop-shadow(0 0 8px var(--accent-glow))';
+                container.classList.remove('celebrate');
+                label.textContent = "Completed";
+                label.style.color = 'var(--text-muted)';
+            }
+        }
+
+        function calculateStreaks() {
+            const dates = Object.keys(logs).sort((a, b) => new Date(b) - new Date(a));
+            let currentStreak = 0;
+            let bestStreak = parseInt(localStorage.getItem('ky_best_streak')) || 0;
+            let tempStreak = 0;
+
+            const isPerfectDay = (dateStr) => {
+                const dayLogs = logs[dateStr];
+                if (!dayLogs) return false;
+                const keys = Object.keys(dayLogs);
+                if(keys.length === 0) return false;
+                return keys.every(key => dayLogs[key] === true);
+            };
+
+            let checkDate = new Date();
+            let dateStr = checkDate.toISOString().split('T')[0];
+            
+            if (!isPerfectDay(dateStr)) {
+                checkDate.setDate(checkDate.getDate() - 1);
+                dateStr = checkDate.toISOString().split('T')[0];
+            }
+
+            while (logs[dateStr] && isPerfectDay(dateStr)) {
+                currentStreak++;
+                checkDate.setDate(checkDate.getDate() - 1);
+                dateStr = checkDate.toISOString().split('T')[0];
+            }
+
+            for (let i = dates.length - 1; i >= 0; i--) {
+                if (isPerfectDay(dates[i])) {
+                    tempStreak++;
+                    if (tempStreak > bestStreak) bestStreak = tempStreak;
+                } else {
+                    tempStreak = 0;
+                }
+            }
+
+            localStorage.setItem('ky_best_streak', bestStreak);
+            document.getElementById('stat-streak').textContent = currentStreak;
+            document.getElementById('stat-best').textContent = bestStreak;
+        }
+
+        function renderMatrix() {
+            const grid = document.getElementById('matrix-grid');
+            grid.innerHTML = '';
+            
+            const numDays = 28; 
+            const datesArr = [];
+            
+            for (let i = numDays - 1; i >= 0; i--) {
+                let d = new Date();
+                d.setDate(d.getDate() - i);
+                datesArr.push(d.toISOString().split('T')[0]);
+            }
+
+            const theme = localStorage.getItem('ky_theme') || 'emerald';
+            let r=16, g=185, b=129; 
+            if(theme === 'blue') { r=56; g=189; b=248; }
+            else if(theme === 'purple') { r=168; g=85; b=247; }
+
+            datesArr.forEach(date => {
+                const cell = document.createElement('div');
+                cell.className = 'matrix-cell';
+                
+                let score = 0;
+                if (logs[date]) {
+                    const keys = Object.keys(logs[date]);
+                    if (keys.length > 0) {
+                        const done = keys.filter(k => logs[date][k] === true).length;
+                        score = Math.round((done / keys.length) * 100);
+                    }
+                }
+
+                const displayDate = new Date(date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+                cell.setAttribute('data-date', displayDate);
+                cell.setAttribute('data-score', score);
+
+                if (score > 0) {
+                    if (score < 40) {
+                        cell.style.background = `rgba(${r}, ${g}, ${b}, 0.2)`;
+                        cell.style.borderColor = `rgba(${r}, ${g}, ${b}, 0.3)`;
+                    } else if (score < 80) {
+                        cell.style.background = `rgba(${r}, ${g}, ${b}, 0.5)`;
+                        cell.style.borderColor = `rgba(${r}, ${g}, ${b}, 0.6)`;
+                    } else if (score < 100) {
+                        cell.style.background = `rgba(${r}, ${g}, ${b}, 0.8)`;
+                        cell.style.borderColor = `rgba(${r}, ${g}, ${b}, 0.9)`;
+                        cell.style.boxShadow = `0 0 10px rgba(${r}, ${g}, ${b}, 0.4)`;
+                    } else {
+                        cell.style.background = `rgba(${r}, ${g}, ${b}, 1)`;
+                        cell.style.borderColor = `#fff`;
+                        cell.style.boxShadow = `0 0 15px rgba(${r}, ${g}, ${b}, 0.6)`;
+                    }
+                }
+                grid.appendChild(cell);
+            });
+        }
+
+        // --- 3. Run Initialization ---
+        document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        setTheme(localStorage.getItem('ky_theme') || 'emerald');
+        updateDashboard(); 
+    </script>
+</body>
+</html>
